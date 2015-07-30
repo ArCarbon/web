@@ -1,20 +1,20 @@
-<md-toolbar layout="row">
-  <div class="md-toolbar-tools" layout-align="space-between center">
-    <div>
-      <md-button ng-click="toggleSidenav('left')" hide-gt-sm class="md-icon-button">
-        <md-icon aria-label="Menu" md-svg-icon="https://s3-us-west-2.amazonaws.com/s.cdpn.io/68133/menu.svg"></md-icon>
-      </md-button>
-      <p>The Land App</p>
+<div layout="column" layout-align="" style="height: 100%">
+  <md-toolbar layout="row">
+    <div class="md-toolbar-tools" layout-align="space-between center">
+      <div>
+        <md-button ng-click="toggleSidenav('left')" hide-gt-sm class="md-icon-button">
+          <md-icon aria-label="Menu" md-svg-icon="https://s3-us-west-2.amazonaws.com/s.cdpn.io/68133/menu.svg"></md-icon>
+        </md-button>
+        <p>The Land App</p>
+        <!--<div osel-search="searchConfig"></div>-->
+      </div>
+      <div layout="row" layout-align="end center">
+        <p>Logged in as {{auth.profile.nickname}}</p>
+        <md-button class="" ng-click="logout()">Logout</md-button>
+      </div>
     </div>
-    <div layout="row" layout-align="end center">
-      <p>Logged in as {{auth.profile.nickname}}</p>
-      <md-button class="md-raised" ng-click="callApi()">Call API</md-button>
-      <md-button class="md-raised" ng-click="logout()">Logout</md-button>
-    </div>
-  </div>
-</md-toolbar>
-<input ng-model='someText'></input>
-<md-button class="md-raised md-primary" ng-click="uploadSomeText()">Upload some text!</md-button>
-<md-button class="md-raised md-primary" ng-click="listFiles()">List files</md-button>
-<pre>{{files | json }}</pre>
-<leaflet layers="layers" center="gower"></leaflet>
+  </md-toolbar>
+  <leaflet layers="layers" center="liverpool"></leaflet>
+  
+  <!--<div class='craig'></div>-->
+</div>
