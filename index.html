@@ -1,49 +1,55 @@
-<html lang="en" ng-app="StarterApp">
+<!DOCTYPE html>
+<html ng-app="sample" ng-controller="AppCtrl">
+  <head>
+    <title ng-bind="pageTitle"></title>
 
-<head>
-	<link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/angular_material/0.9.4/angular-material.min.css">
-	<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=RobotoDraft:300,400,500,700,400italic">
-	<link href='https://api.tiles.mapbox.com/mapbox.js/v2.2.1/mapbox.css' rel='stylesheet' />
-	<script src='https://api.tiles.mapbox.com/mapbox.js/v2.2.1/mapbox.js'></script>
-	<meta name="viewport" content="initial-scale=1" />
+    <!--<script type="text/javascript" src="//use.typekit.net/iws6ohy.js"></script>-->
+    <!--<script type="text/javascript">try{Typekit.load();}catch(e){}</script>-->
 
-	<link href='https://api.tiles.mapbox.com/mapbox.js/plugins/leaflet-draw/v0.2.2/leaflet.draw.css' rel='stylesheet' />
-	<script src='https://api.tiles.mapbox.com/mapbox.js/plugins/leaflet-draw/v0.2.2/leaflet.draw.js'></script>
-	<script src='https://api.tiles.mapbox.com/mapbox.js/plugins/leaflet-geodesy/v0.1.0/leaflet-geodesy.js'></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
 
+    <!-- Angular Material CSS -->
+    <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/angular_material/0.9.4/angular-material.min.css">
+	  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=RobotoDraft:300,400,500,700,400italic">
 
-	<link rel="stylesheet" href="style.css">
-</head>
+    <!-- font awesome from BootstrapCDN -->
+    <!--<link href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" rel="stylesheet">-->
+    <link href="//maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet">
+    <link rel="stylesheet" type="text/css" href="app.css">
+    <link rel="stylesheet" type="text/css" href="home/home.css">
+    <link rel="stylesheet" type="text/css" href="login/login.css">
 
-<body layout="column" ng-controller="AppCtrl">
-	<md-toolbar layout="row">
-		<div class="md-toolbar-tools">
-			<md-button ng-click="toggleSidenav('left')" hide-gt-sm class="md-icon-button">
-				<md-icon aria-label="Menu" md-svg-icon="https://s3-us-west-2.amazonaws.com/s.cdpn.io/68133/menu.svg"></md-icon>
-			</md-button>
-			<h1>The Land App</h1>
-		</div>
-	</md-toolbar>
-	<div layout="row" flex>
-		<!--<md-sidenav layout="column" class="md-sidenav-left md-whiteframe-z2" md-component-id="left" md-is-locked-open="$mdMedia('gt-sm')">-->
+    <script type="text/javascript" src="auth0-variables.js"></script>
+    <script type="text/javascript" src="https://cdn.auth0.com/js/lock-7.js"></script>
+    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.0/angular.js"></script>
+    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.0/angular-animate.js"></script>
+    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.0/angular-aria.js"></script>
+    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.0/angular-cookies.js"></script>
+    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.0/angular-route.js"></script>
+    
+    <script src="bower_components/leaflet/dist/leaflet.js"></script>
+    <script src="leaflet-tilelayer-wmts.js"></script>
+    <link rel="stylesheet" href="bower_components/leaflet/dist/leaflet.css" type="text/css" />
 
-		<!--</md-sidenav>-->
-		<div layout="column" flex id="content">
-			<md-content layout="column" flex class="md-padding" style="padding:0;">
-				<nav id='menu-ui' class='menu-ui'>
-					<md-button class="md-raised md-primary" ng-click="toggleFeature()">Toggle Farm</md-button>
-					<md-button class="md-raised md-primary" ng-click="toggleFeatureGroup()">Toggle Project</md-button>
-				</nav>
-				<div id='map'></div>
-			</md-content>
-		</div>
-	</div>
-	<!-- Angular Material Dependencies -->
-	<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.15/angular.min.js"></script>
-	<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.15/angular-animate.min.js"></script>
-	<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.15/angular-aria.min.js"></script>
-	<script src="https://ajax.googleapis.com/ajax/libs/angular_material/0.9.4/angular-material.min.js"></script>
-	<script src="script.js"></script>
-</body>
+    <script type="text/javascript" src="bower_components/angular-leaflet-directive/dist/angular-leaflet-directive.js"></script>
+    
+    <!-- Angular Material -->
+	  <script src="https://ajax.googleapis.com/ajax/libs/angular_material/0.9.4/angular-material.js"></script>
+    
+    <script type="text/javascript" src="https://cdn.auth0.com/w2/auth0-angular-4.js"></script>
+    <script src="//cdn.rawgit.com/auth0/angular-storage/master/dist/angular-storage.js" type="text/javascript"> </script>
+    <script src="//cdn.rawgit.com/auth0/angular-jwt/master/dist/angular-jwt.js" type="text/javascript"> </script>
+    <script type="text/javascript" src="app.js"></script>
+    <script type="text/javascript" src="home/home.js"></script>
+    <script type="text/javascript" src="login/login.js"></script>
 
+    <!-- AWS sdk -->
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1.41.min.js"></script>
+    
+    <script type="text/javascript" src="bower_components/moment/min/moment-with-locales.min.js"></script>
+
+  </head>
+  <body>
+    <div class="container" ng-view></div>
+  </body>
 </html>

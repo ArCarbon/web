@@ -1,0 +1,21 @@
+{
+  "name": "the-land-app",
+  "version": "0.0.1",
+  "homepage": "https://github.com/TheLandApp/web",
+  "authors": [
+    "craig@snyders.co.uk"
+  ],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "devDependencies": {
+    "angular-leaflet-directive": "~0.8.6",
+    "aws-sdk-js": "~2.1.41",
+    "moment": "~2.10.6"
+  }
+}

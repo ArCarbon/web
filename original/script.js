@@ -1,6 +1,30 @@
-var app = angular.module('StarterApp', ['ngMaterial']);
+var app = angular.module('StarterApp', ['ngMaterial', 'auth0', 'angular-storage', 'angular-jwt']);
 
+app.config(function (authProvider) {
+  authProvider.init({
+    domain: 'craigsnyders.eu.auth0.com',
+    clientID: 'a6UdPChDVcXFOuzWiJjI8Whudzq3orgg'
+  });
+});
 
+app.run(function(auth) {
+  // This hooks all auth events to check everything as soon as the app starts
+  auth.hookEvents();
+});
+
+app.controller('LoginCtrl', ['$scope', '$http', 'auth', 'store', '$location',
+function ($scope, $http, auth, store, $location) {
+  $scope.login = function () {
+    auth.signin({}, function (profile, token) {
+      // Success callback
+      store.set('profile', profile);
+      store.set('token', token);
+      $location.path('/');
+    }, function () {
+      // Error callback
+    });
+  }
+}]);
 
 app.controller('AppCtrl', ['$scope', '$mdSidenav', function($scope, $mdSidenav) {
 

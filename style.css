@@ -1,7 +1,15 @@
 /* Don't know what this is but it's very important */
-#map { position:absolute; top:0; bottom:0; width:100%; }
+
+#map {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 100%;
+}
+
 
 /* Don't know what this is but it's very important */
+
 .md-toolbar-tools h1 {
   font-size: inherit;
   font-weight: inherit;
@@ -9,15 +17,15 @@
 }
 
 
-
-
 /* From now on it's Jeremy's code */
 
 .menu-ui {
-  position:absolute;
-  top:10px;right:10px;
-  z-index:1;
-  }
-  .menu-ui a {
-    display:block;
-    }
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+}
+
+.menu-ui a {
+  display: block;
+}
