@@ -1,6 +1,6 @@
 angular.module('sample.home', ['auth0', 'leaflet-directive', 'osel-search']).service('home-service', ['$http', '$window', 'auth', 'store', '$q', function($http, $window, auth, store, $q) {
 
-  var awsCredentials = store.get('awsCreds');
+  var awsCredentials = store.get('awsCredentials');
 
   var folderPrefix = 'json/';
   var bucket = new $window.AWS.S3({
@@ -68,7 +68,7 @@ angular.module('sample.home', ['auth0', 'leaflet-directive', 'osel-search']).ser
 
 
     $scope.auth = auth;
-    $scope.awsCreds = store.get('awsCreds');
+    $scope.awsCredentials = store.get('awsCredentials');
 
 
 
@@ -84,7 +84,7 @@ angular.module('sample.home', ['auth0', 'leaflet-directive', 'osel-search']).ser
       auth.signout();
       store.remove('profile');
       store.remove('token');
-      store.remove('awsCreds');
+      store.remove('awsCredentials');
       $location.path('/login');
     }
 
@@ -139,6 +139,10 @@ angular.module('sample.home', ['auth0', 'leaflet-directive', 'osel-search']).ser
         zoom: 17
       },
 
+      controls: {
+        draw: {}
+      },
+
       layers: {
         baselayers: {
           osm: {
@@ -168,57 +172,197 @@ angular.module('sample.home', ['auth0', 'leaflet-directive', 'osel-search']).ser
             },
             visible: true
 
+          },
+          draw: {
+            name: 'draw',
+            type: 'group',
+            visible: true,
+            layerParams: {
+              showOnSelector: false
+            }
           }
         }
       }
     });
 
 
+    var parseGridRef = function parseGridRef(gridref) {
+      gridref = String(gridref).trim();
+
+      // check for fully numeric comma-separated gridref format
+      var match = gridref.match(/^(\d+),\s*(\d+)$/);
+      if (match) {
+        return {
+          e: match[1],
+          n: match[2]
+        };
+      }
+
+      // validate format
+      match = gridref.match(/^[A-Z]{2}\s*[0-9]+\s*[0-9]+$/i);
+      if (!match) {
+        return {}
+      }
+
+      // get numeric values of letter references, mapping A->0, B->1, C->2, etc:
+      var l1 = gridref.toUpperCase().charCodeAt(0) - 'A'.charCodeAt(0);
+      var l2 = gridref.toUpperCase().charCodeAt(1) - 'A'.charCodeAt(0);
+      // shuffle down letters after 'I' since 'I' is not used in grid:
+      if (l1 > 7) l1--;
+      if (l2 > 7) l2--;
+
+      // convert grid letters into 100km-square indexes from false origin (grid square SV):
+      var e100km = ((l1 - 2) % 5) * 5 + (l2 % 5);
+      var n100km = (19 - Math.floor(l1 / 5) * 5) - Math.floor(l2 / 5);
+
+      // skip grid letters to get numeric (easting/northing) part of ref
+      var en = gridref.slice(2).trim().split(/\s+/);
+      // if e/n not whitespace separated, split half way
+      if (en.length == 1) en = [en[0].slice(0, en[0].length / 2), en[0].slice(en[0].length / 2)];
+
+      // validation
+      if (e100km < 0 || e100km > 6 || n100km < 0 || n100km > 12) return {};
+      if (en.length != 2) return {};
+      if (en[0].length != en[1].length) return {};
+
+      // standardise to 10-digit refs (metres)
+      en[0] = (en[0] + '00000').slice(0, 5);
+      en[1] = (en[1] + '00000').slice(0, 5);
+
+      var e = e100km + en[0];
+      var n = n100km + en[1];
+
+      return {
+        e: e,
+        n: n,
+        gridRef: gridref.replace(/^[a-z]{2}[0-9]+/i, gridref.slice(0, 2) + ' ' + gridref.slice(2))
+      };
+    };
+
+    var x = [{
+      id: 'NAMES',
+      method: 'GET',
+      params: {
+        q: '%s'
+      },
+      url: $window.rootPath + 'api/search/names',
+      title: 'Places',
+      transformResponse: function(response) {
+        return {
+          results: response.data.map(function(result) {
+            var texts = [result.name];
+            if (result.locality) {
+              texts.push(result.locality);
+            }
+            result.text = texts.join(', ');
+            result.projection = 'EPSG:27700';
+            return result;
+          })
+        };
+      },
+      onSelect: function(result, hideSearch) {
+        console.log(result.x, result.y);
+        hideSearch();
+      }
+    }, {
+      id: 'ADDRESSES',
+      method: 'GET',
+      params: {
+        q: '%s'
+      },
+      url: $window.rootPath + 'api/search/addresses',
+      title: 'Addresses',
+      transformResponse: function(response) {
+        var capitalise = function capitalise(str) {
+          return str.toLowerCase().replace(/\b\w/g, function(char) {
+            return char.toUpperCase();
+          });
+        };
+
+        var postcodeRegex = /(GIR ?0AA|[A-PR-UWYZ]([0-9]{1,2}|([A-HK-Y][0-9]([0-9ABEHMNPRV-Y])?)|[0-9][A-HJKPS-UW]) ?[0-9][ABD-HJLNP-UW-Z]{2})/i;
+
+        return {
+          results: response.data.map(function(result) {
+            // lowercase all text
+            // capitalise each word
+            // uppercase all postcodes
+            // replace spaces in postcode with non-breaking spaces
+            result.text = capitalise(result.name).replace(postcodeRegex, function(m) {
+              return m.toUpperCase().replace(' ', ' ');
+            });
+            result.projection = 'EPSG:27700';
+            return result;
+          })
+        };
+      },
+      onSelect: function(result, hideSearch) {
+        console.log(result.x, result.y);
+        hideSearch();
+      }
+    }];
+
     $scope.searchConfig = {
-      placeholder: 'Type to search...',
-      providers: [{ // AJAX based provider
-        id: 'NAMES',
-        method: 'GET',
-        params: { // put an object here to send as query parameters
-          q: '%s' // %s is a special value - it will be replaced with the user's search query
+      placeholder: 'Search',
+      providers: [{
+        id: 'GRIDREF',
+        title: 'Grid Reference',
+        fn: function(term) {
+          var location = {};
+
+          if (/^[a-z]/i.test(term.trim())) {
+            location = parseGridRef(term);
+          }
+
+          if (location && location.e && location.n) {
+            return {
+              results: [{
+                text: location.gridRef.toUpperCase(),
+                e: location.e,
+                n: location.n,
+                projection: 'EPSG:27700'
+              }]
+            };
+          }
+
+          return {
+            results: []
+          }
         },
-        url: '/api/search/names',
-        title: 'Places', // friendly name to display
-        data: undefined, // when doing a POST, put an object here to send as form data
         onSelect: function(result, hideSearch) {
-          console.log('got result: ' + JSON.stringify(result));
+          console.log(result.x, result.y);
           hideSearch();
         }
-      }, { // Function based provider
-        id: 'ECHO_UPPERCASE',
-        title: 'Echo',
+      }, {
+        id: 'COORDS',
+        title: 'Coordinates',
         fn: function(term) {
-          var upper = term;
-          try {
-            upper = term.toUpperCase();
-          }
-          catch (e) {}
+          var location = {};
 
-          // return an array to illustrate how transformResponse can be used
-          return [{
-            text: upper
-          }]
-        },
-        transformResponse: function(response) {
-          // return an object with a results property containing the array
+          if (/^[0-9]/i.test(term.trim())) {
+            location = parseGridRef(term);
+          }
+
+          if (location && location.e && location.n) {
+            return {
+              results: [{
+                text: location.e + ' ' + location.n,
+                e: location.e,
+                n: location.n,
+                projection: 'EPSG:27700'
+              }]
+            };
+          }
+
           return {
-            results: response.map(function(e) {
-              e.text = e.text + '!'; // add an exclamation mark to each result!
-              return e;
-            })
-          };
+            results: []
+          }
         },
         onSelect: function(result, hideSearch) {
-          console.log('got result: ' + JSON.stringify(result));
+          console.log(result.x, result.y);
           hideSearch();
         }
       }]
-    };
+    };;
 
   }
 ]);

@@ -24,7 +24,8 @@ angular.module( 'sample.login', [
       principal: "arn:aws:iam::345848811994:saml-provider/auth0-provider",
       success: function() {} // workaround to allow .then to get proper result as argument
     }).then(function(result) {
-      store.set('awsCreds', result.Credentials);
+      store.set('awsCredentials', result.Credentials);
+      console.log('got aws credentials', result.Credentials);
     });
     $log.log(auth.getDelegationToken);
   };
