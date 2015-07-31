@@ -1,6 +1,6 @@
-angular.module('sample.home', ['auth0', 'osel-search']).service('home-service', ['$http', '$window', 'auth', 'store', '$q', function($http, $window, auth, store, $q) {
+angular.module('sample.home', ['auth0', 'osel-search']).service('home-service', ['$http', '$window', 'auth', 'store', '$q', '$rootScope', function($http, $window, auth, store, $q, $rootScope) {
 
-  var awsCredentials = store.get('awsCredentials');
+  var service = this;
 
   var folderPrefix = 'json/';
   var bucket = new $window.AWS.S3({
@@ -8,17 +8,25 @@ angular.module('sample.home', ['auth0', 'osel-search']).service('home-service', 
       Bucket: 'landapp.user.data'
     }
   });
-  bucket.config.credentials = new $window.AWS.Credentials(awsCredentials.AccessKeyId, awsCredentials.SecretAccessKey, awsCredentials.SessionToken)
+
+  // watch localstorage, until aws credentials are available
+  $rootScope.$watch(function() {
+    return store.get('awsCredentials');
+  }, function(awsCredentials) {
+    if (awsCredentials) {
+      bucket.config.credentials = new $window.AWS.Credentials(awsCredentials.AccessKeyId, awsCredentials.SecretAccessKey, awsCredentials.SessionToken);
+      service.ready = true;
+    }
+  });
+
+  service.ready = false;
 
 
+  service.getPolygons = function() {
+    console.log('getting polygons @ ' + folderPrefix + auth.profile.user_id + '/polygons.json');
 
-  this.getPolygons = function() {
-
-
-    console.log('getting signed url for', folderPrefix + auth.profile.user_id + '/polygons.json');
-
+    // return a promise
     return $q(function(resolve, reject) {
-
       bucket.getObject({
         Bucket: 'landapp.user.data',
         Key: folderPrefix + auth.profile.user_id + '/polygons.json'
@@ -27,9 +35,10 @@ angular.module('sample.home', ['auth0', 'osel-search']).service('home-service', 
           reject(err);
         }
         else {
+          // convert buffer to string, try to parse JSON
           var parsed = JSON.parse(String.fromCharCode.apply(null, data.Body));
-          if (parsed && parsed.data) {
-            resolve(parsed.data);
+          if (parsed) {
+            resolve(parsed);
           }
           else {
             reject();
@@ -40,15 +49,15 @@ angular.module('sample.home', ['auth0', 'osel-search']).service('home-service', 
 
   };
 
-  this.savePolygons = function savePolygons(polygons) {
+  service.savePolygons = function savePolygons(polygons) {
+
+    // return a promise
     return $q(function(resolve, reject) {
 
       var params = {
         Key: folderPrefix + auth.profile.user_id + '/polygons.json',
         ContentType: 'application/json',
-        Body: JSON.stringify({
-          data: polygons
-        }),
+        Body: JSON.stringify(polygons),
         ACL: 'private'
       };
       bucket.putObject(params, function(err, data) {
@@ -63,22 +72,13 @@ angular.module('sample.home', ['auth0', 'osel-search']).service('home-service', 
 
   };
 
-}]).controller('HomeCtrl', ['$scope', 'auth', '$http', '$location', 'store', '$mdSidenav', '$window', 'home-service',
-  function HomeController($scope, auth, $http, $location, store, $mdSidenav, $window, homeService) {
+}]).controller('HomeCtrl', ['$scope', 'auth', '$http', '$location', 'store', '$mdSidenav', '$window', 'home-service', '$rootScope',
+  function HomeController($scope, auth, $http, $location, store, $mdSidenav, $window, homeService, $rootScope) {
 
 
-
-    $scope.auth = auth;
-    $scope.awsCredentials = store.get('awsCredentials');
-
-
-    $scope.logout = function() {
-      auth.signout();
-      store.remove('profile');
-      store.remove('token');
-      store.remove('awsCredentials');
-      $location.path('/login');
-    }
+    $scope.logout = function logout() {
+      $rootScope.$emit('logout');
+    };
 
     var liverpool = {
       lat: 53.415569,
@@ -94,7 +94,7 @@ angular.module('sample.home', ['auth0', 'osel-search']).service('home-service', 
     $scope.map = $window.L.map('map', {
       center: [center.lat, center.lng],
       zoom: center.zoom,
-      layers: [basemap, boundaries],
+      layers: [basemap],
       crs: $window.L.CRS.EPSG3857
     });
 
@@ -104,71 +104,148 @@ angular.module('sample.home', ['auth0', 'osel-search']).service('home-service', 
     var drawControl = new $window.L.Control.Draw({
       edit: {
         featureGroup: drawnItems
+      },
+      draw: { // only allow polygon and rectangle drawing tools
+        polygon: true,
+        polyline: false,
+        rectangle: true,
+        circle: false,
+        marker: false
       }
     });
     $scope.map.addControl(drawControl);
 
-
-
-    // event fires when user finishes drawing a shape
-    $scope.map.on('draw:created', function(e) {
-      drawnItems.addLayer(e.layer);
-      console.log('new polygon created', e.layer._latlngs);
-
-      homeService.savePolygons(drawnItems.toGeoJSON());
-    });
-
     $window.L.control.layers({
       OSM: basemap
     }, {
-      boundaries: boundaries,
       drawing: drawnItems
     }).addTo($scope.map);
 
-    $scope.polygons = [];
+    // when user finishes drawing a shape
+    // save the polygons back to AWS
+    $scope.map.on('draw:created', function(e) {
+      e.layer.setStyle({
+        fillColor: "#15693b",
+        color: "#15693b",
+        opacity: 1,
+        fillOpacity: 0.3,
+        weight: 3
+      });
+      drawnItems.addLayer(e.layer);
+      console.log('new polygon created', e.type, e.layer._latlngs);
 
-    homeService.getPolygons().then(function(polygons) {
-      console.log('got initial polygons', polygons);
+      var area = $window.LGeo.area(e.layer); // meters squared
+      var hectares = area / 10000;
 
-      // polygons.forEach(function(polygon) {
-      var layer = new $window.L.Proj.geoJson(polygons);
-      console.log(layer);
-      drawnItems.addLayer(layer).addTo($scope.map);
-      $scope.polygons = polygons;
-      // })
+      if (area) {
+        // persist area on the properties object for that feature
+        e.layer.properties = e.layer.properties || {};
+        e.layer.properties.area = area;
+
+        // display area in a popup, and also print out to console
+        e.layer.bindPopup(hectares.toFixed(2) + ' ha');
+        e.layer.on('click', function(feature) {
+          console.log('clicked', (area).toFixed(2) + 'm sq');
+        });
+      }
+
+
+      // ==== now SAVE everything ====
+      // get all features from the layer as geoJSON
+      var features = [];
+      $window.drawnItems.getLayers().forEach(function(layer) {
+        if (layer.hasOwnProperty('_latlngs')) {
+          features.push(layer.toGeoJSON());
+        }
+        else {
+          for (var l in layer._layers) {
+            if (layer._layers.hasOwnProperty(l)) {
+              features.push(layer._layers[l].toGeoJSON());
+            }
+          }
+        }
+      });
+      homeService.savePolygons({
+        type: 'FeatureCollection',
+        features: features
+      });
+      
+      $scope.features = features;
+      console.log('new features', features);
+
     });
 
-    // persist polygons whenever the list changes
-    $scope.$watch('polygons', function(newVal, oldVal) {
-      if (newVal && newVal.length > 0 && newVal !== oldVal) {
-        // homeService.savePolygons(newVal);
-        console.log('saving polygons', newVal)
+    
+    
+
+
+    var cancelWatchForUserPolygons = $scope.$watch(function() {
+      return homeService.ready
+    }, function(ready) {
+      if (!!ready) {
+        homeService.getPolygons().then(function(polygons) {
+          console.log('got initial polygons from AWS:', polygons);
+
+          $scope.features = polygons.features;
+          
+          // homeService.savePolygons({
+          //   type: 'FeatureCollection',
+          //   features: [{
+          //     type: 'Feature',
+          //     properties: null,
+          //     geometry: {
+          //       type: 'Polygon',
+          //       coordinates: [
+          //         [
+          //           [-2.941417694091797, 53.41606741491586],
+          //           [-2.9413533210754395, 53.415133824711646],
+          //           [-2.9384565353393555, 53.41508906302262],
+          //           [-2.938671112060547, 53.41614414744581],
+          //           [-2.941417694091797, 53.41606741491586]
+          //         ]
+          //       ]
+          //     }
+          //   }]
+          // });
+          // return;
+
+          // use proj4leaflet to parse geoJSON into a new layer
+          var layer = new $window.L.Proj.geoJson(polygons);
+
+          layer.setStyle({
+            fillColor: "#15693b",
+            color: "#15693b",
+            opacity: 1,
+            fillOpacity: 0.3,
+            weight: 3
+          });
+
+          // attach click handlers for each feature on the layer
+          layer.getLayers().forEach(function(featureLayer) {
+            var area = $window.LGeo.area(featureLayer); // meters squared
+            var hectares = area / 10000;
+
+            // some shapes might not have an area... linestring i'm looking at you!
+            if (area) {
+              // persist area on the properties object for that feature
+              featureLayer.feature.properties = featureLayer.feature.properties || {};
+              featureLayer.feature.properties.area = area;
+
+              // display area in a popup, and also print out to console
+              featureLayer.bindPopup(hectares.toFixed(2) + ' ha');
+              featureLayer.on('click', function(feature) {
+                console.log('clicked', feature.target._leaflet_id, (area).toFixed(2) + 'm sq');
+              });
+            }
+          });
+
+          // keep track of feature layers in the drawnItems layer
+          drawnItems.addLayer(layer).addTo($scope.map);
+        });
+
+        cancelWatchForUserPolygons(); // unregister $watch event
       }
     }, true);
-
-    homeService.savePolygons({
-      type: 'FeatureCollection',
-      features: [{
-        type: 'Feature',
-        geometry: {
-          type: 'Polygon',
-          coordinates: [
-            [
-              [-2.941417694091797, 53.41606741491586],
-              [-2.9413533210754395, 53.415133824711646],
-              [-2.9384565353393555, 53.41508906302262],
-              [-2.938671112060547, 53.41614414744581]
-            ]
-          ]
-        }
-      }]
-      // crs: {
-      //   type: 'EPSG',
-      //   properties: {
-      //     code: '3857'
-      //   }
-      // }
-    });
 
 
     // var parseGridRef = function parseGridRef(gridref) {

@@ -5,22 +5,27 @@
         <md-button ng-click="toggleSidenav('left')" hide-gt-sm class="md-icon-button">
           <md-icon aria-label="Menu" md-svg-icon="img/icons/menu.svg"></md-icon>
         </md-button>
-        <p>The Land App</p>
+        <p>AR Carbon</p>
         <!--<div osel-search="searchConfig"></div>-->
-        
+
       </div>
-      
+
       <div layout="row" layout-align="end center">
         <p>Logged in as {{auth.profile.nickname}}</p>
         <md-button class="" ng-click="logout()">Logout</md-button>
       </div>
     </div>
   </md-toolbar>
-  <div layout="row" class="floating-toolbar">
-    <md-button class="md-fab md-primary">Pen</md-button>
-  </div>
+  <!--<div layout="row" class="floating-toolbar">-->
+  <!--  <md-button class="md-fab md-primary">Pen</md-button>-->
+  <!--</div>-->
   <!--<leaflet layers="layers" center="liverpool" controls="controls"></leaflet>-->
-   <div id="map"></div>
+
+  <md-sidenav md-component-id="left" class="md-sidenav-left" md-is-open="features.length > 3">
+    Left Nav!
+  </md-sidenav>
+
+  <div id="map"></div>
   <!--<div class="lock-size" layout="row" layout-align="center center">-->
   <!--    <md-fab-speed-dial md-open="demo.isOpen" md-direction="{{demo.selectedDirection}}"-->
   <!--                       ng-class="demo.selectedMode">-->
