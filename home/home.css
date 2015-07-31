@@ -1,14 +1,76 @@
-.angular-leaflet-map {
-  width: 100%;
-  height: 100%;
-}
-
-.floating-toolbar {
-    position: absolute;
-    right: 50px;
+md-toast {
+    z-index: 1001;
 }
 
 #map { 
     height: 100%; 
     width: 100%;
+}
+
+.welcome-back {
+    margin-bottom: 0;
+}
+
+.welcome-back + p {
+    margin-top: 0;
+}
+
+.field-name {
+    display: inline-block;
+}
+
+.field-area {
+    position: absolute;
+    right: 0;
+    margin: 16px 48px 0 0;
+}
+
+.field-container + .field-container {
+    border-top: 1px solid #dfdfdf;
+}
+
+.field-description {
+    margin: 0 0 16px 0;
+    font-size: 14px;
+}
+
+.delete-field {
+    position: absolute;
+    right: 0;
+    font-size: 20px;
+    font-weight: 300;
+    /*margin-top: -12px;*/
+    padding: 8px 16px;
+    cursor: pointer;
+}
+
+.total-hectares-container {
+    font-weight: 400;
+    font-size: 24px;
+    margin-bottom: 16px;
+    padding: 16px;
+}
+
+.total-hectares {
+    font-size: 32px;
+    font-weight: 300;
+    position: absolute;
+    right: 16px;
+    top: 12px;
+}
+
+.pink-background {
+    background-color: #ffc0c0;
+}
+
+.green-background {
+    background-color: #daeac6;
+}
+
+.green-text {
+    color: #15693b;
+}
+
+.red-text {
+    color: #ff0000;
 }

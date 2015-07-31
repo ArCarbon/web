@@ -1,5 +1,5 @@
 <div layout="column" layout-align="" style="height: 100%">
-  <md-toolbar layout="row">
+  <md-toolbar layout="row" ng-if="false">
     <div class="md-toolbar-tools" layout-align="space-between center">
       <div>
         <md-button ng-click="toggleSidenav('left')" hide-gt-sm class="md-icon-button">
@@ -20,12 +20,33 @@
   <!--  <md-button class="md-fab md-primary">Pen</md-button>-->
   <!--</div>-->
   <!--<leaflet layers="layers" center="liverpool" controls="controls"></leaflet>-->
+  <div layout="row" style="height: 100%">
+    <md-sidenav md-component-id="left" class="md-sidenav-left" md-is-locked-open="true">
+      <md-toolbar class="md-theme-indigo">
+        <h1 class="md-toolbar-tools">AR Carbon</h1>
 
-  <md-sidenav md-component-id="left" class="md-sidenav-left" md-is-open="features.length > 3">
-    Left Nav!
-  </md-sidenav>
+      </md-toolbar>
+      <md-content layout-padding>
 
-  <div id="map"></div>
+        <p class="md-subhead welcome-back">Welcome back</p>
+        <p class="username md-headline">{{auth.profile.nickname}}</p>
+        <!--<p ng-show="features.length < 10">Begin by drawing a field</p>-->
+      </md-content>
+      <md-content>
+        <div class="total-hectares-container" ng-class="{'green-background': getTotalArea() < 500000, 'pink-background': getTotalArea() > 500000}">Total hectares <span class="total-hectares" ng-class="{'green-text': getTotalArea() < 500000, 'red-text': getTotalArea() > 500000}">{{(getTotalArea() / 10000).toFixed(2)}}</span></div>
+      </md-content>
+      <md-content layout-padding>
+        <div ng-repeat="feature in features track by feature.properties.guid" class="field-container">
+          <p class="field-name">Field {{$index}}</p>
+          <span class="field-area">{{(feature.properties.area / 10000 ).toFixed(2)}}</span>
+          <span class="delete-field" ng-click="deleteField(feature)">&times;</span>
+          <p class="field-description">Description of this field goes here</p>
+        </div>
+      </md-content>
+    </md-sidenav>
+
+    <div id="map"></div>
+  </div>
   <!--<div class="lock-size" layout="row" layout-align="center center">-->
   <!--    <md-fab-speed-dial md-open="demo.isOpen" md-direction="{{demo.selectedDirection}}"-->
   <!--                       ng-class="demo.selectedMode">-->
@@ -48,4 +69,19 @@
   <!--    </md-fab-speed-dial>-->
   <!--  </div>-->
   <!--<div class='craig'></div>-->
+
+
+
 </div>
+
+
+<script type="text/ng-template" id="onboarding.html">
+  <md-dialog>
+    <md-dialog-content>
+      <p>Select your location by dropping a pin</p>
+    </md-dialog-content>
+    <div class="md-actions">
+      <md-button ng-click="closeDialog()" class="md-raised md-primary">Ok, got it</md-button>
+    </div>
+  </md-dialog>
+</script>

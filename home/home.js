@@ -1,11 +1,11 @@
-angular.module('sample.home', ['auth0', 'osel-search']).service('home-service', ['$http', '$window', 'auth', 'store', '$q', '$rootScope', function($http, $window, auth, store, $q, $rootScope) {
+angular.module('sample.home', ['auth0', 'osel-search']).service('home-service', ['$http', '$window', 'auth', 'store', '$q', '$rootScope', 'login-service', '$mdToast', function($http, $window, auth, store, $q, $rootScope, loginService, $mdToast) {
 
   var service = this;
 
   var folderPrefix = 'json/';
   var bucket = new $window.AWS.S3({
     params: {
-      Bucket: 'landapp.user.data'
+      Bucket: 'arcarbon.user.data'
     }
   });
 
@@ -15,7 +15,25 @@ angular.module('sample.home', ['auth0', 'osel-search']).service('home-service', 
   }, function(awsCredentials) {
     if (awsCredentials) {
       bucket.config.credentials = new $window.AWS.Credentials(awsCredentials.AccessKeyId, awsCredentials.SecretAccessKey, awsCredentials.SessionToken);
-      service.ready = true;
+      console.log(bucket.config.credentials);
+      
+      if (!!bucket.config.credentials.expired) {
+        console.log('token expired... logging out');
+        $rootScope.$emit('logout');
+      } else {
+        console.log('token valid')
+        $mdToast.cancel();
+        service.ready = true;
+      }
+    } else {
+      console.log('no aws token found, waiting...');
+      var toastConfig = $mdToast.simple();
+      toastConfig.hideDelay(0);
+      toastConfig.content('Sorry, we couln\'t load your saved data.');
+      toastConfig.position('top right');
+      service.toast = $mdToast.show(toastConfig);
+      
+      
     }
   });
 
@@ -28,7 +46,7 @@ angular.module('sample.home', ['auth0', 'osel-search']).service('home-service', 
     // return a promise
     return $q(function(resolve, reject) {
       bucket.getObject({
-        Bucket: 'landapp.user.data',
+        Bucket: 'arcarbon.user.data',
         Key: folderPrefix + auth.profile.user_id + '/polygons.json'
       }, function(err, data) {
         if (err) {
@@ -72,9 +90,8 @@ angular.module('sample.home', ['auth0', 'osel-search']).service('home-service', 
 
   };
 
-}]).controller('HomeCtrl', ['$scope', 'auth', '$http', '$location', 'store', '$mdSidenav', '$window', 'home-service', '$rootScope',
-  function HomeController($scope, auth, $http, $location, store, $mdSidenav, $window, homeService, $rootScope) {
-
+}]).controller('HomeCtrl', ['$scope', 'auth', '$http', '$location', 'store', '$mdSidenav', '$window', 'home-service', '$rootScope', '$mdDialog',
+  function HomeController($scope, auth, $http, $location, store, $mdSidenav, $window, homeService, $rootScope, $mdDialog) {
 
     $scope.logout = function logout() {
       $rootScope.$emit('logout');
@@ -105,10 +122,10 @@ angular.module('sample.home', ['auth0', 'osel-search']).service('home-service', 
       edit: {
         featureGroup: drawnItems
       },
-      draw: { // only allow polygon and rectangle drawing tools
+      draw: { // only allow polygon drawing tool
         polygon: true,
         polyline: false,
-        rectangle: true,
+        rectangle: false,
         circle: false,
         marker: false
       }
@@ -132,14 +149,16 @@ angular.module('sample.home', ['auth0', 'osel-search']).service('home-service', 
         weight: 3
       });
       drawnItems.addLayer(e.layer);
-      console.log('new polygon created', e.type, e.layer._latlngs);
-
+      
       var area = $window.LGeo.area(e.layer); // meters squared
       var hectares = area / 10000;
-
+      
+      console.log('new polygon created', e.type, e.layer._latlngs, area);
+      
+      e.layer.properties = e.layer.properties || {};
+      
       if (area) {
         // persist area on the properties object for that feature
-        e.layer.properties = e.layer.properties || {};
         e.layer.properties.area = area;
 
         // display area in a popup, and also print out to console
@@ -148,35 +167,32 @@ angular.module('sample.home', ['auth0', 'osel-search']).service('home-service', 
           console.log('clicked', (area).toFixed(2) + 'm sq');
         });
       }
-
+      
+      // if (!e.layer.properties.guid) {
+        
+      //   e.layer.properties.guid = guid();
+      //   console.log('setting guid', e.layer);
+      //   $window.l = e.layer;
+      // }
 
       // ==== now SAVE everything ====
-      // get all features from the layer as geoJSON
-      var features = [];
-      $window.drawnItems.getLayers().forEach(function(layer) {
-        if (layer.hasOwnProperty('_latlngs')) {
-          features.push(layer.toGeoJSON());
-        }
-        else {
-          for (var l in layer._layers) {
-            if (layer._layers.hasOwnProperty(l)) {
-              features.push(layer._layers[l].toGeoJSON());
-            }
-          }
-        }
-      });
-      homeService.savePolygons({
-        type: 'FeatureCollection',
-        features: features
-      });
-      
-      $scope.features = features;
-      console.log('new features', features);
+      save();
+      $scope.$apply();
 
     });
 
-    
-    
+    $scope.getTotalArea = function() {
+      if ($scope.features) {
+        return $scope.features.map(function(f) {
+          return f.properties.area;
+        }).reduce(function(prev, curr) {
+          return prev + curr;
+        }, 0);
+      }
+
+      return 0;
+    };
+
 
 
     var cancelWatchForUserPolygons = $scope.$watch(function() {
@@ -187,12 +203,14 @@ angular.module('sample.home', ['auth0', 'osel-search']).service('home-service', 
           console.log('got initial polygons from AWS:', polygons);
 
           $scope.features = polygons.features;
-          
+
           // homeService.savePolygons({
           //   type: 'FeatureCollection',
           //   features: [{
           //     type: 'Feature',
-          //     properties: null,
+          //     properties: {
+          //       guid: 1234
+          //     },
           //     geometry: {
           //       type: 'Polygon',
           //       coordinates: [
@@ -248,183 +266,69 @@ angular.module('sample.home', ['auth0', 'osel-search']).service('home-service', 
     }, true);
 
 
-    // var parseGridRef = function parseGridRef(gridref) {
-    //   gridref = String(gridref).trim();
+    var save = function save() {
+      // get all features from the layer as geoJSON
+      var features = [];
+      $window.drawnItems.getLayers().forEach(function(layer) {
+        if (layer.hasOwnProperty('_latlngs')) {
+          var geoJSON = layer.toGeoJSON();
+          geoJSON.properties = {
+            area: $window.LGeo.area(layer),
+            guid: guid() // todo check if we ever overwrite the guid by mistake?
+          }
+          features.push(geoJSON);
+        } else {
+          for (var l in layer._layers) {
+            if (layer._layers.hasOwnProperty(l)) {
+              features.push(layer._layers[l].toGeoJSON());
+            }
+          }
+        }
+      });
+      homeService.savePolygons({
+        type: 'FeatureCollection',
+        features: features
+      });
 
-    //   // check for fully numeric comma-separated gridref format
-    //   var match = gridref.match(/^(\d+),\s*(\d+)$/);
-    //   if (match) {
-    //     return {
-    //       e: match[1],
-    //       n: match[2]
-    //     };
-    //   }
+      $scope.features = features;
+      console.log('new features', features);
+      
+    };
 
-    //   // validate format
-    //   match = gridref.match(/^[A-Z]{2}\s*[0-9]+\s*[0-9]+$/i);
-    //   if (!match) {
-    //     return {}
-    //   }
+    $scope.deleteField = function deleteField(feature) {
+      console.log('delete', feature);
+      $scope.features.splice($scope.features.indexOf(feature),1);
+      
+      var layer = drawnItems.getLayers()[0];
+      var featureLayer;
+      for (var l in layer._layers) {
+        if (layer._layers.hasOwnProperty(l)) {
+          if (layer._layers[l].feature.properties.guid === feature.properties.guid) {
+            console.log('removed layer', layer._layers[l]);
+            layer.removeLayer(layer._layers[l]);
+          }
+        }
+      }
+      
+      save();
+      
+    };
+    
+    // onboarding modal
+    // $mdDialog.show({
+    //   clickOutsideToClose: true,
+    //   scope: $scope,
+    //   preserveScope: true,
+    //   templateUrl: 'onboarding.html'
+    // });
 
-    //   // get numeric values of letter references, mapping A->0, B->1, C->2, etc:
-    //   var l1 = gridref.toUpperCase().charCodeAt(0) - 'A'.charCodeAt(0);
-    //   var l2 = gridref.toUpperCase().charCodeAt(1) - 'A'.charCodeAt(0);
-    //   // shuffle down letters after 'I' since 'I' is not used in grid:
-    //   if (l1 > 7) l1--;
-    //   if (l2 > 7) l2--;
-
-    //   // convert grid letters into 100km-square indexes from false origin (grid square SV):
-    //   var e100km = ((l1 - 2) % 5) * 5 + (l2 % 5);
-    //   var n100km = (19 - Math.floor(l1 / 5) * 5) - Math.floor(l2 / 5);
-
-    //   // skip grid letters to get numeric (easting/northing) part of ref
-    //   var en = gridref.slice(2).trim().split(/\s+/);
-    //   // if e/n not whitespace separated, split half way
-    //   if (en.length == 1) en = [en[0].slice(0, en[0].length / 2), en[0].slice(en[0].length / 2)];
-
-    //   // validation
-    //   if (e100km < 0 || e100km > 6 || n100km < 0 || n100km > 12) return {};
-    //   if (en.length != 2) return {};
-    //   if (en[0].length != en[1].length) return {};
-
-    //   // standardise to 10-digit refs (metres)
-    //   en[0] = (en[0] + '00000').slice(0, 5);
-    //   en[1] = (en[1] + '00000').slice(0, 5);
-
-    //   var e = e100km + en[0];
-    //   var n = n100km + en[1];
-
-    //   return {
-    //     e: e,
-    //     n: n,
-    //     gridRef: gridref.replace(/^[a-z]{2}[0-9]+/i, gridref.slice(0, 2) + ' ' + gridref.slice(2))
-    //   };
-    // };
-
-    // var x = [{
-    //   id: 'NAMES',
-    //   method: 'GET',
-    //   params: {
-    //     q: '%s'
-    //   },
-    //   url: $window.rootPath + 'api/search/names',
-    //   title: 'Places',
-    //   transformResponse: function(response) {
-    //     return {
-    //       results: response.data.map(function(result) {
-    //         var texts = [result.name];
-    //         if (result.locality) {
-    //           texts.push(result.locality);
-    //         }
-    //         result.text = texts.join(', ');
-    //         result.projection = 'EPSG:27700';
-    //         return result;
-    //       })
-    //     };
-    //   },
-    //   onSelect: function(result, hideSearch) {
-    //     console.log(result.x, result.y);
-    //     hideSearch();
-    //   }
-    // }, {
-    //   id: 'ADDRESSES',
-    //   method: 'GET',
-    //   params: {
-    //     q: '%s'
-    //   },
-    //   url: $window.rootPath + 'api/search/addresses',
-    //   title: 'Addresses',
-    //   transformResponse: function(response) {
-    //     var capitalise = function capitalise(str) {
-    //       return str.toLowerCase().replace(/\b\w/g, function(char) {
-    //         return char.toUpperCase();
-    //       });
-    //     };
-
-    //     var postcodeRegex = /(GIR ?0AA|[A-PR-UWYZ]([0-9]{1,2}|([A-HK-Y][0-9]([0-9ABEHMNPRV-Y])?)|[0-9][A-HJKPS-UW]) ?[0-9][ABD-HJLNP-UW-Z]{2})/i;
-
-    //     return {
-    //       results: response.data.map(function(result) {
-    //         // lowercase all text
-    //         // capitalise each word
-    //         // uppercase all postcodes
-    //         // replace spaces in postcode with non-breaking spaces
-    //         result.text = capitalise(result.name).replace(postcodeRegex, function(m) {
-    //           return m.toUpperCase().replace(' ', ' ');
-    //         });
-    //         result.projection = 'EPSG:27700';
-    //         return result;
-    //       })
-    //     };
-    //   },
-    //   onSelect: function(result, hideSearch) {
-    //     console.log(result.x, result.y);
-    //     hideSearch();
-    //   }
-    // }];
-
-    // $scope.searchConfig = {
-    //   placeholder: 'Search',
-    //   providers: [{
-    //     id: 'GRIDREF',
-    //     title: 'Grid Reference',
-    //     fn: function(term) {
-    //       var location = {};
-
-    //       if (/^[a-z]/i.test(term.trim())) {
-    //         location = parseGridRef(term);
-    //       }
-
-    //       if (location && location.e && location.n) {
-    //         return {
-    //           results: [{
-    //             text: location.gridRef.toUpperCase(),
-    //             e: location.e,
-    //             n: location.n,
-    //             projection: 'EPSG:27700'
-    //           }]
-    //         };
-    //       }
-
-    //       return {
-    //         results: []
-    //       }
-    //     },
-    //     onSelect: function(result, hideSearch) {
-    //       console.log(result.x, result.y);
-    //       hideSearch();
-    //     }
-    //   }, {
-    //     id: 'COORDS',
-    //     title: 'Coordinates',
-    //     fn: function(term) {
-    //       var location = {};
-
-    //       if (/^[0-9]/i.test(term.trim())) {
-    //         location = parseGridRef(term);
-    //       }
-
-    //       if (location && location.e && location.n) {
-    //         return {
-    //           results: [{
-    //             text: location.e + ' ' + location.n,
-    //             e: location.e,
-    //             n: location.n,
-    //             projection: 'EPSG:27700'
-    //           }]
-    //         };
-    //       }
-
-    //       return {
-    //         results: []
-    //       }
-    //     },
-    //     onSelect: function(result, hideSearch) {
-    //       console.log(result.x, result.y);
-    //       hideSearch();
-    //     }
-    //   }]
-    // };
+    
+    var guid = function guid() {
+      var s4 = function s4() {
+        return Math.floor((1 + Math.random()) * 0x10000).toString(16).substring(1);
+      };
+      return s4() + s4() + '-' + s4() + '-' + s4() + '-' + s4() + '-' + s4() + s4() + s4();
+    }
 
   }
 ]);
